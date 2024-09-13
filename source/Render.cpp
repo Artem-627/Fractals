@@ -6,14 +6,21 @@
 #include <thread>
 #include <atomic>
 
-MandelbrotSetRender::MandelbrotSetRender(const Box &start_view_box, const std::uint32_t &width,
-                                         const std::uint32_t &height) {
+MandelbrotSetRender::MandelbrotSetRender(
+    const Box &start_view_box,
+    const std::function<Complex(const Complex &point)> &getFirstZ_,
+    const std::function<Complex(const Complex &z, const Complex &point)> &function_,
+    const std::function<bool(const Complex &z)> &exitCondition_,
+    const std::uint32_t &width,
+    const std::uint32_t &height){
     window = new sf::RenderWindow(sf::VideoMode(width, height), "Mandelbrot Set");
     window->setFramerateLimit(30);
 
-    curr_box = new Box(start_view_box);
-    // std::cout << "(" << curr_box->min.x << ", " << curr_box->min.y << ")" << " -> ";
-    // std::cout << "(" << curr_box->max.x << ", " << curr_box->max.y << ")" << '\n';
+    curr_box.push(start_view_box);
+
+    function = function_;
+    getFirstZ = getFirstZ_;
+    exitCondition = exitCondition_;
 }
 
 void MandelbrotSetRender::startRender() {
@@ -32,6 +39,9 @@ void MandelbrotSetRender::startRender() {
         while (window->pollEvent(event)) {
             if (event.type == sf::Event::Closed) {
                 window->close();
+            }
+            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape && curr_box.size() != 1) {
+                curr_box.pop();
             }
             if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && !(is_rect_exist)) {
                 is_rect_exist.store(true);
@@ -52,22 +62,24 @@ void MandelbrotSetRender::startRender() {
                                 const float curr_d_y = 1 - static_cast<float>(area_curr_point_y.load()) / static_cast<float>(curr_view_height);
 
                                 const Point new_first_curr_box{
-                                    curr_box->min.x + start_d_x * (curr_box->max.x - curr_box->min.x),
-                                    curr_box->max.y - start_d_y * (curr_box->max.y - curr_box->min.y)
+                                    curr_box.top().min.x + start_d_x * (curr_box.top().max.x - curr_box.top().min.x),
+                                    curr_box.top().max.y - start_d_y * (curr_box.top().max.y - curr_box.top().min.y)
                                 };
                                 const Point new_curr_curr_box{
-                                    curr_box->min.x + curr_d_x * (curr_box->max.x - curr_box->min.x),
-                                    curr_box->max.y - curr_d_y * (curr_box->max.y - curr_box->min.y)
+                                    curr_box.top().min.x + curr_d_x * (curr_box.top().max.x - curr_box.top().min.x),
+                                    curr_box.top().max.y - curr_d_y * (curr_box.top().max.y - curr_box.top().min.y)
                                 };
 
-                                curr_box->min = Point{
-                                    std::min(new_first_curr_box.x, new_curr_curr_box.x),
-                                    std::min(new_first_curr_box.y, new_curr_curr_box.y)
-                                };
-                                curr_box->max = Point{
-                                    std::max(new_first_curr_box.x, new_curr_curr_box.x),
-                                    std::max(new_first_curr_box.y, new_curr_curr_box.y)
-                                };
+                                curr_box.push({
+                                    Point{
+                                        std::min(new_first_curr_box.x, new_curr_curr_box.x),
+                                        std::min(new_first_curr_box.y, new_curr_curr_box.y)
+                                    },
+                                    Point{
+                                        std::max(new_first_curr_box.x, new_curr_curr_box.x),
+                                        std::max(new_first_curr_box.y, new_curr_curr_box.y)
+                                    }
+                                });
                             }
 
                             is_rect_exist.store(false);
@@ -88,8 +100,8 @@ void MandelbrotSetRender::startRender() {
             }
         }
 
-        float curr_box_x_size = (curr_box->max.x - curr_box->min.x);
-        float curr_box_y_size = (curr_box->max.y - curr_box->min.y);
+        float curr_box_x_size = (curr_box.top().max.x - curr_box.top().min.x);
+        float curr_box_y_size = (curr_box.top().max.y - curr_box.top().min.y);
 
         float window_x_size = static_cast<float>(window->getSize().x);
         float window_y_size = static_cast<float>(window->getSize().y);
@@ -110,11 +122,11 @@ void MandelbrotSetRender::startRender() {
         for (int curr_x = 0; curr_x < static_cast<std::uint32_t>(image_x_size); ++curr_x) {
             for (int curr_y = 0; curr_y < static_cast<std::uint32_t>(image_y_size); ++curr_y) {
                 Complex point(
-                    curr_box->min.x + (curr_box->max.x - curr_box->min.x) / image_x_size * static_cast<float>(curr_x),
-                    curr_box->min.y + (curr_box->max.y - curr_box->min.y) / image_y_size * static_cast<float>(curr_y)
+                    curr_box.top().min.x + (curr_box.top().max.x - curr_box.top().min.x) / image_x_size * static_cast<float>(curr_x),
+                    curr_box.top().min.y + (curr_box.top().max.y - curr_box.top().min.y) / image_y_size * static_cast<float>(curr_y)
                 );
 
-                const std::int16_t iterations = MandelbrotSet::checkPoint(point, 60);
+                const std::int16_t iterations = MandelbrotSet::checkPoint(point, 50, getFirstZ, function, exitCondition);
 
                 if (iterations == -1) {
                     image.setPixel(curr_x, curr_y, Colors::gradient[0]);
@@ -142,14 +154,8 @@ void MandelbrotSetRender::startRender() {
         texture.loadFromImage(image);
         sf::Sprite sprite(texture);
 
-
-
-        std::cout << "{" << sprite.getLocalBounds().height << ", " << sprite.getLocalBounds().width << "}" << '\n';
         curr_view_width.store(sprite.getLocalBounds().width);
         curr_view_height.store(sprite.getLocalBounds().height);
-
-        // sprite.move(50, 50);
-
 
 
         window->clear(sf::Color(150, 150, 150));
