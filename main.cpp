@@ -1,15 +1,14 @@
 #include <Complex.h>
+#include <Primitives.h>
 #include <iostream>
+#include <SFML/Graphics.hpp>
+
+#include "MandelbrotSet.h"
+#include "Render.h"
 
 int main() {
-  constexpr Complex a(1, 1);
-  constexpr Complex b(3, 5);
-
-  std::cout << a + b << '\n';
-  std::cout << a - b << '\n';
-  std::cout << a * b << '\n';
-  std::cout << a * 3 << '\n';
-  std::cout << a.abs() << '\n';
+  MandelbrotSetRender mandelbrot_set_render({{-2, -2}, {2, 2}}, 800, 800);
+  mandelbrot_set_render.startRender();
 
   return 0;
 }

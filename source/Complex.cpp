@@ -47,3 +47,8 @@ Complex operator-(const Complex &number) {
 std::ostream& operator<<(std::ostream &os, const Complex &number) {
     return os << number.real << (number.imaginary > 0 ? "+" : "-") << (number.imaginary > 0 ? number.imaginary : -number.imaginary) << 'i';
 }
+
+
+float Complex::abs() const {
+    return std::sqrt(real * real + imaginary * imaginary);
+}

@@ -8,8 +8,18 @@ set(SFML_DIR "${SFML_LIBRARY_DIRECTORY}/lib/cmake/SFML")
 
 add_executable(${PROJECT_NAME}
         main.cpp
+
         include/Complex.h
         source/Complex.cpp
+
+        include/MandelbrotSet.h
+        source/MandelbrotSet.cpp
+
+        include/Primitives.h
+        source/Primitives.cpp
+
+        include/Render.h
+        source/Render.cpp
 )
 
 include_directories(

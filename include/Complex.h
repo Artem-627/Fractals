@@ -9,9 +9,7 @@ public:
     float imaginary;
 
     [[nodiscard]]
-    float abs() const {
-        return std::sqrt(real * real + imaginary * imaginary);
-    }
+    float abs() const;
 
 
     friend Complex operator+(const Complex &first, const Complex &second);
